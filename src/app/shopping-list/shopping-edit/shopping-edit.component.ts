@@ -1,6 +1,8 @@
-import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
+import {Component, OnInit, ViewChild} from '@angular/core';
+import {Subscription} from "rxjs/Subscription";
 import {Ingredient} from "../../shared/ingredient.model";
 import {ShoppingListService} from "../shopping-list.service";
+import {NgForm} from "@angular/forms";
 
 @Component({
   selector: 'app-shopping-edit',
@@ -8,18 +10,51 @@ import {ShoppingListService} from "../shopping-list.service";
   styleUrls: ['./shopping-edit.component.css']
 })
 export class ShoppingEditComponent implements OnInit {
-  @ViewChild('nameInput') nameInputref: ElementRef;
-  @ViewChild('amountInput') amountInputref: ElementRef;
+  @ViewChild('f') slForm: NgForm
+  subscription: Subscription;
+  editedIndex: number;
+  editMode = false;
+  editIngredient: Ingredient;
 
   constructor(private shoppingListService: ShoppingListService) { }
 
   ngOnInit() {
+    this.subscription = this.shoppingListService.startedEditing
+      .subscribe(
+        (index: number) => {
+          this.editMode = true;
+          this.editedIndex = index;
+          this.editIngredient = this.shoppingListService.getIngredient(index);
+          this.slForm.setValue({
+            name:this.editIngredient.name,
+            amount: this.editIngredient.amount
+          });
+        }
+      );
   }
 
-  onAddItem() {
-    const name = this.nameInputref.nativeElement.value;
-    const amount = this.amountInputref.nativeElement.value;
-    this.shoppingListService.addIngredient(new Ingredient(name, amount));
+  onSubmit(form: NgForm) {
+    const value = form.value;
+    if(!this.editMode){
+      this.shoppingListService.addIngredient(new Ingredient(value.name, value.amount));
+    } else{
+      this.shoppingListService.updateIngredient(this.editedIndex,new Ingredient(value.name, value.amount));
+    }
+    form.reset();
+    this.editMode = false;
   }
 
+  onClear(){
+    this.slForm.reset();
+    this.editMode = false;  
+  }
+
+  onDelete(){
+    this.shoppingListService.deleteIngredient(this.editedIndex);
+    this.onClear();
+  }
+
+  onDestroy(){
+    this.subscription.unsubscribe();
+  }
 }
